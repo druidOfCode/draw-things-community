@@ -74,6 +74,17 @@ swift_binary(
     ],
 )
 
+swift_binary(
+    name = "ModelDiscoveryCLI",
+    srcs = glob(["ModelDiscoveryCLI/*.swift"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//Libraries/GRPC:GRPCServer",
+        "@SwiftArgumentParser//:ArgumentParser",
+        "@SwiftLog//:Logging",
+    ],
+)
+
 macos_command_line_application(
     name = "gRPCServerCLI-macOS",
     bundle_id = "com.liuliu.draw-things-grpc-server-cli",

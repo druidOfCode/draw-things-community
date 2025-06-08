@@ -38,6 +38,7 @@ swift_library(
         "Server/Sources/GRPCServerAdvertiser.swift",
         "Server/Sources/ImageGenerationClientWrapper.swift",
         "Server/Sources/ImageGenerationServiceImpl.swift",
+        "Server/Sources/ModelDiscoveryClient.swift",
         "Server/Sources/ProtectedValue.swift",
     ] + select({
         ":ios_or_macos_build": [

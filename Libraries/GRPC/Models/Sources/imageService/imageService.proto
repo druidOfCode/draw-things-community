@@ -5,6 +5,7 @@ service ImageGenerationService {
   rpc FilesExist(FileListRequest) returns (FileExistenceResponse);
   rpc UploadFile(stream FileUploadRequest) returns (stream UploadResponse);
   rpc Echo(EchoRequest) returns (EchoReply);
+  rpc ListAvailableModels(ListModelsRequest) returns (ListModelsResponse);
 }
 
 message EchoRequest {
@@ -159,4 +160,27 @@ message FileUploadRequest {
     FileChunk chunk = 2;                // File chunk data.
   }
   optional string sharedSecret = 3; // The secret use to authenticate if needed.
+}
+
+message ListModelsRequest {
+  optional string sharedSecret = 1;
+}
+
+message ModelInfo {
+  string name = 1;
+  string file = 2;
+  string humanReadableName = 3;
+  string version = 4;
+  bool isDownloaded = 5;
+  int64 fileSize = 6;
+  string note = 7;
+  repeated string requiredFiles = 8;
+}
+
+message ListModelsResponse {
+  repeated ModelInfo models = 1;
+  repeated ModelInfo loras = 2;
+  repeated ModelInfo controlNets = 3;
+  repeated ModelInfo upscalers = 4;
+  bool sharedSecretMissing = 5;
 }

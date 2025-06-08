@@ -548,7 +548,6 @@ public class ImageGenerationServiceImpl: ImageGenerationServiceProvider {
       logger.info("Received echo from: \(request.name), enableModelBrowsing:\(enableModelBrowsing)")
       if let sharedSecret = sharedSecret, !sharedSecret.isEmpty {
         guard request.sharedSecret == sharedSecret else {
-          // Mismatch on shared secret.
           $0.sharedSecretMissing = true
           return
         }
@@ -556,7 +555,6 @@ public class ImageGenerationServiceImpl: ImageGenerationServiceProvider {
       $0.sharedSecretMissing = false
       $0.message = "HELLO \(request.name)"
       if enableModelBrowsing {
-        // Looking for ckpt files.
         let internalFilePath = ModelZoo.internalFilePathForModelDownloaded("")
         let fileManager = FileManager.default
         var fileUrls = [URL]()
@@ -573,7 +571,6 @@ public class ImageGenerationServiceImpl: ImageGenerationServiceProvider {
         {
           fileUrls.append(contentsOf: urls)
         }
-        // Check if the file ends with ckpt. If it is, this is a file we need to fill.
         $0.files = fileUrls.compactMap {
           guard let values = try? $0.resourceValues(forKeys: [.fileSizeKey]) else { return nil }
           guard let fileSize = values.fileSize, fileSize > 0 else { return nil }
@@ -581,7 +578,6 @@ public class ImageGenerationServiceImpl: ImageGenerationServiceProvider {
           guard file.lowercased().hasSuffix(".ckpt") else { return nil }
           return file
         }
-        // Load all specifications that is available locally into override JSON payload.
         let models = ModelZoo.availableSpecifications.filter {
           return ModelZoo.isModelDownloaded($0)
         }
@@ -608,6 +604,113 @@ public class ImageGenerationServiceImpl: ImageGenerationServiceProvider {
         }
       }
     }
+    return context.eventLoop.makeSucceededFuture(response)
+  }
+
+  public func listAvailableModels(
+    request: GRPCImageServiceModels.ListModelsRequest, context: any GRPC.StatusOnlyCallContext
+  ) -> NIOCore.EventLoopFuture<GRPCImageServiceModels.ListModelsResponse> {
+    let enableModelBrowsing = enableModelBrowsing.load(ordering: .acquiring)
+    
+    guard enableModelBrowsing else {
+      let response = ListModelsResponse.with {
+        $0.sharedSecretMissing = false
+      }
+      return context.eventLoop.makeSucceededFuture(response)
+    }
+    
+    let response = ListModelsResponse.with {
+      if let sharedSecret = sharedSecret, !sharedSecret.isEmpty {
+        guard request.sharedSecret == sharedSecret else {
+          $0.sharedSecretMissing = true
+          return
+        }
+      }
+      $0.sharedSecretMissing = false
+      
+      let fileManager = FileManager.default
+      
+      func getFileSize(_ filePath: String) -> Int64 {
+        guard let attributes = try? fileManager.attributesOfItem(atPath: filePath),
+              let size = attributes[.size] as? Int64 else {
+          return 0
+        }
+        return size
+      }
+      
+      func createModelInfo(from spec: ModelZoo.Specification) -> ModelInfo {
+        return ModelInfo.with {
+          $0.name = spec.file
+          $0.file = spec.file
+          $0.humanReadableName = spec.name
+          $0.version = ModelZoo.humanReadableNameForVersion(spec.version)
+          $0.isDownloaded = ModelZoo.isModelDownloaded(spec)
+          $0.fileSize = getFileSize(ModelZoo.filePathForModelDownloaded(spec.file))
+          $0.note = spec.note ?? ""
+          
+          var requiredFiles = [spec.file]
+          if let textEncoder = spec.textEncoder {
+            requiredFiles.append(textEncoder)
+          }
+          if let autoencoder = spec.autoencoder {
+            requiredFiles.append(autoencoder)
+          }
+          if let imageEncoder = spec.imageEncoder {
+            requiredFiles.append(imageEncoder)
+          }
+          $0.requiredFiles = requiredFiles
+        }
+      }
+      
+      $0.models = ModelZoo.availableSpecifications.compactMap { spec in
+        guard ModelZoo.isModelDownloaded(spec) else { return nil }
+        return createModelInfo(from: spec)
+      }
+      
+      $0.loras = LoRAZoo.availableSpecifications.compactMap { spec in
+        guard LoRAZoo.isModelDownloaded(spec) else { return nil }
+        return ModelInfo.with {
+          $0.name = spec.file
+          $0.file = spec.file
+          $0.humanReadableName = spec.name
+          $0.version = ModelZoo.humanReadableNameForVersion(spec.version)
+          $0.isDownloaded = true
+          $0.fileSize = getFileSize(ModelZoo.filePathForModelDownloaded(spec.file))
+          $0.note = ""
+          $0.requiredFiles = [spec.file]
+        }
+      }
+      
+      $0.controlNets = ControlNetZoo.availableSpecifications.compactMap { spec in
+        guard ControlNetZoo.isModelDownloaded(spec) else { return nil }
+        return ModelInfo.with {
+          $0.name = spec.file
+          $0.file = spec.file
+          $0.humanReadableName = spec.name
+          $0.version = ModelZoo.humanReadableNameForVersion(spec.version)
+          $0.isDownloaded = true
+          $0.fileSize = getFileSize(ModelZoo.filePathForModelDownloaded(spec.file))
+          $0.note = ""
+          $0.requiredFiles = [spec.file]
+        }
+      }
+      
+      $0.upscalers = UpscalerZoo.availableSpecifications.compactMap { spec in
+        guard UpscalerZoo.isModelDownloaded(spec.file) else { return nil }
+        return ModelInfo.with {
+          $0.name = spec.file
+          $0.file = spec.file
+          $0.humanReadableName = spec.name
+          $0.version = ""
+          $0.isDownloaded = true
+          $0.fileSize = getFileSize(ModelZoo.filePathForModelDownloaded(spec.file))
+          $0.note = ""
+          $0.requiredFiles = [spec.file]
+        }
+      }
+    }
+    
+    logger.info("Returning \($0.models.count) models, \($0.loras.count) LoRAs, \($0.controlNets.count) ControlNets, \($0.upscalers.count) upscalers")
     return context.eventLoop.makeSucceededFuture(response)
   }
 
