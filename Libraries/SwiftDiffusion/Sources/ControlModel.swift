@@ -1,3 +1,4 @@
+import Atomics
 import C_ccv
 import NNC
 
@@ -75,6 +76,7 @@ public struct ControlModel<FloatType: TensorNumeric & BinaryFloatingPoint> {
   public let transformerBlocks: [Int]
   public let targetBlocks: [String]
   public let imageEncoderVersion: ImageEncoderVersion
+  public let deviceProperties: DeviceProperties
   public let ipAdapterConfig: IPAdapterConfig?
   public let firstStage: FirstStage<FloatType>?
   public init(
@@ -82,8 +84,8 @@ public struct ControlModel<FloatType: TensorNumeric & BinaryFloatingPoint> {
     externalOnDemand: Bool, version: ModelVersion, tiledDiffusion: TiledConfiguration,
     usesFlashAttention: Bool, startStep: Int, endStep: Int, controlMode: ControlMode,
     globalAveragePooling: Bool, transformerBlocks: [Int], targetBlocks: [String],
-    imageEncoderVersion: ImageEncoderVersion, ipAdapterConfig: IPAdapterConfig?,
-    firstStage: FirstStage<FloatType>?
+    imageEncoderVersion: ImageEncoderVersion, deviceProperties: DeviceProperties,
+    ipAdapterConfig: IPAdapterConfig?, firstStage: FirstStage<FloatType>?
   ) {
     self.filePaths = filePaths
     self.type = type
@@ -99,6 +101,7 @@ public struct ControlModel<FloatType: TensorNumeric & BinaryFloatingPoint> {
     self.transformerBlocks = transformerBlocks
     self.targetBlocks = targetBlocks
     self.imageEncoderVersion = imageEncoderVersion
+    self.deviceProperties = deviceProperties
     self.ipAdapterConfig = ipAdapterConfig
     self.firstStage = firstStage
   }
@@ -130,7 +133,7 @@ extension ControlModel {
           let newInjectedIPAdapters = injected.model(
             inputStartYPad: 0, inputEndYPad: 0, inputStartXPad: 0, inputEndXPad: 0,
             step: step, inputs: xT, hint, strength: strength, timestep, c[i],
-            tokenLengthUncond: tokenLengthUncond, tokenLengthCond: tokenLengthCond,
+            inputs: [], tokenLengthUncond: tokenLengthUncond, tokenLengthCond: tokenLengthCond,
             isCfgEnabled: isCfgEnabled, index: index,
             mainUNetAndWeightMapper: mainUNetAndWeightMapper,
             controlNet: &existingControlNets[i])
@@ -165,7 +168,8 @@ extension ControlModel {
     controlNets existingControlNets: inout [Model?]
   ) -> (
     (
-      _ xT: DynamicGraph.Tensor<FloatType>, _ inputStartYPad: Int, _ inputEndYPad: Int,
+      _ xT: DynamicGraph.Tensor<FloatType>, _ restInputs: [DynamicGraph.AnyTensor],
+      _ inputStartYPad: Int, _ inputEndYPad: Int,
       _ inputStartXPad: Int, _ inputEndXPad: Int, _ existingControlNets: inout [Model?]
     ) -> (
       injectedControls: [DynamicGraph.Tensor<FloatType>],
@@ -186,7 +190,7 @@ extension ControlModel {
         for (hint, strength) in injected.hints {
           let newHint = injected.model(
             inputStartYPad: 0, inputEndYPad: 0, inputStartXPad: 0, inputEndXPad: 0,
-            step: step, inputs: xT, hint, strength: strength, timestep, c[i],
+            step: step, inputs: xT, hint, strength: strength, timestep, c[i], inputs: [],
             tokenLengthUncond: tokenLengthUncond, tokenLengthCond: tokenLengthCond,
             isCfgEnabled: isCfgEnabled, index: index,
             mainUNetAndWeightMapper: mainUNetAndWeightMapper,
@@ -201,7 +205,7 @@ extension ControlModel {
         for (hint, strength) in injected.hints {
           let newInjectedT2IAdapters = injected.model(
             inputStartYPad: 0, inputEndYPad: 0, inputStartXPad: 0, inputEndXPad: 0,
-            step: step, inputs: xT, hint, strength: strength, timestep, c[i],
+            step: step, inputs: xT, hint, strength: strength, timestep, c[i], inputs: [],
             tokenLengthUncond: tokenLengthUncond, tokenLengthCond: tokenLengthCond,
             isCfgEnabled: isCfgEnabled, index: index,
             mainUNetAndWeightMapper: mainUNetAndWeightMapper,
@@ -214,7 +218,9 @@ extension ControlModel {
         }
       }
     }
-    return { xT, inputStartYPad, inputEndYPad, inputStartXPad, inputEndXPad, existingControlNets in
+    return {
+      xT, restInputs, inputStartYPad, inputEndYPad, inputStartXPad, inputEndXPad,
+      existingControlNets in
       var injectedControls = [DynamicGraph.Tensor<FloatType>]()
       var controlNetMap = [TypeAndFilePaths: Model]()
       for (i, injected) in injecteds.enumerated() {
@@ -233,7 +239,7 @@ extension ControlModel {
             let newInjectedControls = injected.model(
               inputStartYPad: inputStartYPad, inputEndYPad: inputEndYPad,
               inputStartXPad: inputStartXPad, inputEndXPad: inputEndXPad,
-              step: step, inputs: xT, hint, strength: strength, timestep, c[i],
+              step: step, inputs: xT, hint, strength: strength, timestep, c[i], inputs: restInputs,
               tokenLengthUncond: tokenLengthUncond, tokenLengthCond: tokenLengthCond,
               isCfgEnabled: isCfgEnabled, index: index,
               mainUNetAndWeightMapper: mainUNetAndWeightMapper,
@@ -466,26 +472,122 @@ extension ControlModel {
       fatalError()
     }
   }
-  public func hint(inputs: [(hint: DynamicGraph.Tensor<FloatType>, weight: Float)])
+  public func hint(
+    batchSize: Int, startHeight: Int, startWidth: Int, image: DynamicGraph.Tensor<FloatType>?,
+    graph: DynamicGraph, inputs: [(hint: DynamicGraph.Tensor<FloatType>, weight: Float)],
+    cancellation: (@escaping () -> Void) -> Void
+  )
     -> [[DynamicGraph.Tensor<FloatType>]]
   {
-    guard inputs.count > 0 else {
+    let isVACE = (type == .controlnet) && (version == .wan21_1_3b || version == .wan21_14b)
+    guard inputs.count > 0 || isVACE else {
       return []
     }
-    let graph = inputs[0].hint.graph
     switch type {
     case .controlnet, .controlnetlora, .controlnetunion:
+      if let firstStage = firstStage {  // For FLUX.1, we use the VAE as encoder.
+        switch version {
+        case .flux1:
+          var encoder: Model? = nil
+          return inputs.map {
+            let result = firstStage.sample($0.hint, encoder: encoder, cancellation: cancellation)
+            encoder = result.2
+            return [result.0]
+          }
+        case .wan21_14b, .wan21_1_3b:
+          return withoutActuallyEscaping(cancellation) { parent in
+            let isCancelled = ManagedAtomic<Bool>(false)
+            var encoder: Model? = nil
+            let startHeight = startHeight * 8
+            let startWidth = startWidth * 8
+            let cancellation: (@escaping () -> Void) -> Void = { cancel in
+              parent {
+                isCancelled.store(true, ordering: .releasing)
+                cancel()
+              }
+            }
+            let refs: [DynamicGraph.Tensor<FloatType>] = inputs.compactMap {
+              guard !isCancelled.load(ordering: .acquiring) else {
+                return nil
+              }
+              // Use mean rather than sampled from distribution.
+              let result = firstStage.encode($0.hint, encoder: encoder, cancellation: cancellation)
+              let shape = result.0.shape
+              encoder = result.1
+              return firstStage.scale(
+                result.0[0..<shape[0], 0..<shape[1], 0..<shape[2], 0..<16].copied())
+            }
+            guard !isCancelled.load(ordering: .acquiring) else {
+              return [[]]
+            }
+            encoder = nil
+            // Encode empty video, as well as mask.
+            var frames = graph.variable(
+              .GPU(0), .NHWC(((batchSize - refs.count) - 1) * 4 + 1, startHeight, startWidth, 3),
+              of: FloatType.self)
+            frames.full(0)
+            let firstFrames = image?.shape[0] ?? 0
+            if var image = image {
+              if image.shape[1] != startHeight || image.shape[2] != startWidth {
+                image = Upsample(
+                  .bilinear, widthScale: Float(startWidth) / Float(image.shape[2]),
+                  heightScale: Float(startHeight) / Float(image.shape[1]))(image)
+              }
+              frames[0..<firstFrames, 0..<startHeight, 0..<startWidth, 0..<3] = image
+            }
+            var inactive: DynamicGraph.Tensor<FloatType>
+            (inactive, encoder) = firstStage.encode(
+              frames, encoder: encoder, cancellation: cancellation)
+            guard !isCancelled.load(ordering: .acquiring) else {
+              return [[]]
+            }
+            inactive = firstStage.scale(
+              inactive[
+                0..<(batchSize - refs.count), 0..<(startHeight / 8), 0..<(startWidth / 8), 0..<16
+              ].copied())
+            var reactive = inactive
+            if image != nil {
+              frames.full(0)
+              (reactive, _) = firstStage.encode(
+                frames, encoder: encoder, cancellation: cancellation)
+              reactive = firstStage.scale(
+                reactive[
+                  0..<(batchSize - refs.count), 0..<(startHeight / 8), 0..<(startWidth / 8), 0..<16
+                ].copied())
+              guard !isCancelled.load(ordering: .acquiring) else {
+                return [[]]
+              }
+            }
+            encoder = nil
+            var vaceLatents = graph.variable(
+              .GPU(0), .NHWC(batchSize, startHeight / 8, startWidth / 8, 96), of: FloatType.self)
+            vaceLatents.full(0)
+            for (i, ref) in refs.enumerated() {
+              let shape = ref.shape
+              vaceLatents[i..<(i + 1), 0..<shape[1], 0..<shape[2], 0..<16] = ref
+              // Both mask and reactive are 0s.
+            }
+            vaceLatents[
+              refs.count..<batchSize, 0..<(startHeight / 8), 0..<(startWidth / 8), 0..<16] =
+              inactive
+            vaceLatents[
+              refs.count..<batchSize, 0..<(startHeight / 8), 0..<(startWidth / 8), 16..<32] =
+              reactive
+            // Inactive area set mask to 0. The rest are 1s.
+            vaceLatents[
+              (refs.count + (firstFrames > 0 ? (firstFrames - 1) / 4 + 1 : 0))..<batchSize,
+              0..<(startHeight / 8), 0..<(startWidth / 8), 32..<96
+            ].full(1)
+            return [[vaceLatents]]
+          }
+        case .auraflow, .hiDreamI1, .hunyuanVideo, .kandinsky21, .pixart, .sd3, .sd3Large,
+          .sdxlBase, .sdxlRefiner, .ssd1b, .svdI2v, .v1, .v2, .wurstchenStageB, .wurstchenStageC:
+          break
+        }
+      }
       let shape = inputs[0].hint.shape
       let startHeight = shape[1]
       let startWidth = shape[2]
-      if let firstStage = firstStage {  // For FLUX.1, we use the VAE as encoder.
-        var encoder: Model? = nil
-        return inputs.map {
-          let result = firstStage.sample($0.hint, encoder: encoder, cancellation: { _ in })
-          encoder = result.2
-          return [result.0]
-        }
-      }
       let tiledHeight =
         tiledDiffusion.isEnabled
         ? min(tiledDiffusion.tileSize.height * 64, startHeight) : startHeight
@@ -507,11 +609,13 @@ extension ControlModel {
       } else {
         hintNet.compile(inputs: inputs[0].hint)
       }
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
-        $0.read("hintnet", model: hintNet, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+        $0.read("hintnet", model: hintNet, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
       }
       // Note that the Hint network for ControlNet is pretty lightweight, it has 7 convnet with 3x3 reception field. That means as long as we have 3 (scale 1) + 2 * 2 (scale 2) + 2 * 4 (scale 4) + 1 * 8 (scale 8) overlap (23 pixels), the result will exact match (also no group norm). Thus, when we do tile, we don't do the cross-fade but do direct copy.
       if tiledDiffusionIsEnabled {
@@ -604,7 +708,8 @@ extension ControlModel {
           tiledDiffusion.isEnabled
           ? min(tiledDiffusion.tileSize.height * 8, startHeight) : startHeight
         let externalData: DynamicGraph.Store.Codec =
-          externalOnDemand ? .externalOnDemand : .externalData
+          externalOnDemand
+          ? .externalOnDemand : .externalData(deviceProperties.isFreadPreferred ? .fread : .mmap)
         let vaeEncoding = graph.withNoGrad {
           let encoder = Encoder(
             channels: [128, 256, 512, 512], numRepeat: 2, batchSize: 1, startWidth: tiledWidth,
@@ -800,11 +905,13 @@ extension ControlModel {
       }
       resampler.maxConcurrency = .limit(4)
       resampler.compile(inputs: imageEmbeds[0])
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
-        $0.read("resampler", model: resampler, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+        $0.read("resampler", model: resampler, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
       }
       let imagePromptEmbeds = imageEmbeds.map {
         resampler(inputs: $0)[0].as(of: FloatType.self)
@@ -853,7 +960,7 @@ extension ControlModel {
       ) {
         if targetBlocks.isEmpty {
           $0.read(
-            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
         } else {
           let mapping = unetIPFixedMapper(.diffusers)
           var reverseMapping = [String: String]()
@@ -862,7 +969,7 @@ extension ControlModel {
             reverseMapping["__unet_ip_fixed__[\(values[0])]"] = key
           }
           $0.read(
-            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, .externalData]
+            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, externalData]
           ) { name, dataType, format, shape in
             guard let diffusersName = reverseMapping[name] else { return .continue(name) }
             guard diffusersName.hasSuffix("to_v.weight") else { return .continue(name) }
@@ -932,11 +1039,13 @@ extension ControlModel {
         fatalError()
       }
       projModel.compile(inputs: imageEmbeds[0])
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
-        $0.read("proj_model", model: projModel, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+        $0.read("proj_model", model: projModel, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
       }
       let imagePromptEmbeds = imageEmbeds.map {
         projModel(inputs: $0)[0].as(of: FloatType.self)
@@ -985,7 +1094,7 @@ extension ControlModel {
       ) {
         if targetBlocks.isEmpty {
           $0.read(
-            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
         } else {
 
           let mapping = unetIPFixedMapper(.diffusers)
@@ -995,7 +1104,7 @@ extension ControlModel {
             reverseMapping["__unet_ip_fixed__[\(values[0])]"] = key
           }
           $0.read(
-            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, .externalData]
+            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, externalData]
           ) { name, dataType, format, shape in
             guard let diffusersName = reverseMapping[name] else { return .continue(name) }
             guard diffusersName.hasSuffix("to_v.weight") else { return .continue(name) }
@@ -1058,13 +1167,15 @@ extension ControlModel {
         let arcface = ArcFace(batchSize: 1, of: FloatType.self)
         arcface.maxConcurrency = .limit(4)
         arcface.compile(inputs: images[0].1)
+        let externalData: DynamicGraph.Store.Codec = .externalData(
+          deviceProperties.isFreadPreferred ? .fread : .mmap)
         graph.openStore(
           filePaths[2], flags: .readOnly,
           externalStore: TensorData.externalStore(filePath: filePaths[2])
         ) {
           $0.read(
             "arcface", model: arcface,
-            codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+            codec: [.ezm7, .q6p, .q8p, .jit, externalData])
         }
         return images.map {
           arcface(inputs: $0.1)[0].as(of: FloatType.self)
@@ -1085,13 +1196,15 @@ extension ControlModel {
         }
         resampler.maxConcurrency = .limit(4)
         resampler.compile(inputs: faceEmbeds[0], imageEmbeds[0])
+        let externalData: DynamicGraph.Store.Codec = .externalData(
+          deviceProperties.isFreadPreferred ? .fread : .mmap)
         graph.openStore(
           filePaths[0], flags: .readOnly,
           externalStore: TensorData.externalStore(filePath: filePaths[0])
         ) {
           $0.read(
             "resampler", model: resampler,
-            codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+            codec: [.ezm7, .q6p, .q8p, .jit, externalData])
         }
         let zeroFaceEmbed = graph.variable(like: faceEmbeds[0])
         zeroFaceEmbed.full(0)
@@ -1166,13 +1279,15 @@ extension ControlModel {
       }
       unetIPFixed.maxConcurrency = .limit(4)
       unetIPFixed.compile(inputs: batchedImagePromptEmbeds[0])
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
         if targetBlocks.isEmpty {
           $0.read(
-            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
         } else {
           let mapping = unetIPFixedMapper(.diffusers)
           var reverseMapping = [String: String]()
@@ -1181,7 +1296,7 @@ extension ControlModel {
             reverseMapping["__unet_ip_fixed__[\(values[0])]"] = key
           }
           $0.read(
-            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, .externalData]
+            "unet_ip_fixed", model: unetIPFixed, codec: [.ezm7, .q6p, .q8p, .jit, externalData]
           ) { name, dataType, format, shape in
             guard let diffusersName = reverseMapping[name] else { return .continue(name) }
             guard diffusersName.hasSuffix("to_v.weight") else { return .continue(name) }
@@ -1246,13 +1361,15 @@ extension ControlModel {
         let arcface = ArcFace(batchSize: 1, of: FloatType.self)
         arcface.maxConcurrency = .limit(4)
         arcface.compile(inputs: images[0].1)
+        let externalData: DynamicGraph.Store.Codec = .externalData(
+          deviceProperties.isFreadPreferred ? .fread : .mmap)
         graph.openStore(
           filePaths[2], flags: .readOnly,
           externalStore: TensorData.externalStore(filePath: filePaths[2])
         ) {
           $0.read(
             "arcface", model: arcface,
-            codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+            codec: [.ezm7, .q6p, .q8p, .jit, externalData])
         }
         return images.map {
           arcface(inputs: $0.1)[0].as(of: FloatType.self)
@@ -1275,13 +1392,15 @@ extension ControlModel {
         let idCond = Functional.concat(axis: 2, faceEmbeds[0].reshaped(.HWC(1, 1, 512)), idCondVit)
         resampler.maxConcurrency = .limit(4)
         resampler.compile(inputs: [idCond] + idVitHidden)
+        let externalData: DynamicGraph.Store.Codec = .externalData(
+          deviceProperties.isFreadPreferred ? .fread : .mmap)
         graph.openStore(
           filePaths[0], flags: .readOnly,
           externalStore: TensorData.externalStore(filePath: filePaths[0])
         ) {
           $0.read(
             "resampler", model: resampler,
-            codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+            codec: [.ezm7, .q6p, .q8p, .jit, externalData])
         }
         let zeroFaceEmbed = graph.variable(like: faceEmbeds[0])
         zeroFaceEmbed.full(0)
@@ -1332,11 +1451,13 @@ extension ControlModel {
       }
       pulidFixed.maxConcurrency = .limit(4)
       pulidFixed.compile(inputs: batchedImagePromptEmbeds[0])
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
-        $0.read("pulid", model: pulidFixed, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+        $0.read("pulid", model: pulidFixed, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
       }
       let kvs = batchedImagePromptEmbeds.map {
         pulidFixed(inputs: $0).map { $0.as(of: FloatType.self) }
@@ -1394,11 +1515,13 @@ extension ControlModel {
       }
       let redux = Redux(channels: 4096)
       redux.compile(inputs: imageEmbeds[0])
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
-        $0.read("redux", model: redux, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+        $0.read("redux", model: redux, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
       }
       let imagePromptEmbeds = imageEmbeds.map {
         redux(inputs: $0)[0].as(of: FloatType.self)
@@ -1449,11 +1572,13 @@ extension ControlModel {
       }
       let projector = MultiModalProjector(channels: 4096)
       projector.compile(inputs: imageEmbeds[0])
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
-        $0.read("projector", model: projector, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+        $0.read("projector", model: projector, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
       }
       let imagePromptEmbeds = imageEmbeds.map {
         projector(inputs: $0)[0].as(of: FloatType.self)
@@ -1498,11 +1623,13 @@ extension ControlModel {
       } else {
         adapter.compile(inputs: inputs[0].hint)
       }
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) {
-        $0.read("adapter", model: adapter, codec: [.ezm7, .q6p, .q8p, .jit, .externalData])
+        $0.read("adapter", model: adapter, codec: [.ezm7, .q6p, .q8p, .jit, externalData])
       }
       if tiledDiffusionIsEnabled {
         let tileOverlap = min(
@@ -1613,8 +1740,10 @@ extension ControlModel {
       let emptyControl = graph.variable(
         .GPU(0), .HWC(batchSize, (startHeight / 2) * (startWidth / 2), 3072), of: FloatType.self)
       emptyControls = Array(repeating: emptyControl, count: 19 + 38)
+    case .wan21_1_3b, .wan21_14b:
+      emptyControls = []
     case .sd3, .sd3Large, .pixart, .auraflow, .kandinsky21, .svdI2v, .sdxlRefiner, .ssd1b,
-      .wurstchenStageC, .wurstchenStageB, .hunyuanVideo, .wan21_1_3b, .wan21_14b, .hiDreamI1:
+      .wurstchenStageC, .wurstchenStageB, .hunyuanVideo, .hiDreamI1:
       fatalError()
     }
     for emptyControl in emptyControls {
@@ -1850,10 +1979,12 @@ extension ControlModel {
           }
         }
         let controlTypeEncodedTensor = graph.variable(controlTypeEncoded.toGPU(0))
+        let externalData: DynamicGraph.Store.Codec = .externalData(
+          deviceProperties.isFreadPreferred ? .fread : .mmap)
         controlAddEmbed.2.compile(inputs: controlTypeEncodedTensor)
         $0.read(
           "control_add_embed", model: controlAddEmbed.2,
-          codec: [.jit, .ezm7, .externalData, .q6p, .q8p])
+          codec: [.jit, .ezm7, externalData, .q6p, .q8p])
         controlAddEmbedding = controlAddEmbed.2(inputs: controlTypeEncodedTensor)[0].as(
           of: FloatType.self)
         let taskEmbeddings = graph.variable(
@@ -1906,13 +2037,15 @@ extension ControlModel {
         ).0
       controlNetFixed.maxConcurrency = .limit(4)
       controlNetFixed.compile(inputs: crossattn)
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
       ) { store in
         store.read(
           "controlnet_fixed", model: controlNetFixed,
-          codec: [.q6p, .q8p, .ezm7, .jit, .externalData])
+          codec: [.q6p, .q8p, .ezm7, .jit, externalData])
       }
     case .controlnetlora:
       guard let weightMapper = mainUNetFixed.weightMapper else { return textEncoding }
@@ -1934,6 +2067,8 @@ extension ControlModel {
       let unetFixedMapping = Self.flattenWeightMapping(weightMapper)
       let reversedControlNetFixedMapping = Self.reversed(
         Self.flattenWeightMapping(controlNetFixedWeightMapper))
+      let externalData: DynamicGraph.Store.Codec = .externalData(
+        deviceProperties.isFreadPreferred ? .fread : .mmap)
       graph.openStore(
         filePaths[0], flags: .readOnly,
         externalStore: TensorData.externalStore(filePath: filePaths[0])
@@ -1942,7 +2077,7 @@ extension ControlModel {
         // First, read as much parameters from this file first.
         $0.read(
           "controlnet_fixed", model: controlNetFixed,
-          codec: [.q6p, .q8p, .ezm7, .jit, .externalData])
+          codec: [.q6p, .q8p, .ezm7, .jit, externalData])
         // Then, read from the main UNet with a rewrite rule.
         graph.openStore(
           mainUNetFixed.filePath, flags: .readOnly,
@@ -1950,7 +2085,7 @@ extension ControlModel {
         ) {
           $0.read(
             "controlnet_fixed", model: controlNetFixed,
-            codec: [.q6p, .q8p, .ezm7, .jit, .externalData]
+            codec: [.q6p, .q8p, .ezm7, .jit, externalData]
           ) {
             name, _, _, _ in
             guard !keys.contains(name) else {
@@ -2153,7 +2288,8 @@ extension ControlModel {
     inputStartYPad: Int, inputEndYPad: Int, inputStartXPad: Int, inputEndXPad: Int,
     step: Int, inputs xT: DynamicGraph.Tensor<FloatType>, _ hint: [DynamicGraph.Tensor<FloatType>],
     strength: Float, _ timestep: DynamicGraph.Tensor<FloatType>?,
-    _ c: [DynamicGraph.Tensor<FloatType>], tokenLengthUncond: Int, tokenLengthCond: Int,
+    _ c: [DynamicGraph.Tensor<FloatType>], inputs: [DynamicGraph.AnyTensor], tokenLengthUncond: Int,
+    tokenLengthCond: Int,
     isCfgEnabled: Bool, index: Int, mainUNetAndWeightMapper: (AnyModel, ModelWeightMapper)?,
     controlNet existingControlNet: inout Model?
   ) -> [DynamicGraph.Tensor<FloatType>] {
@@ -2169,6 +2305,9 @@ extension ControlModel {
       }
       switch type {
       case .controlnet, .controlnetlora, .controlnetunion:
+        if version == .wan21_1_3b || version == .wan21_14b {
+          DynamicGraph.Tensor<FloatType>(inputs[7]).full(0)  // Disable the influence.
+        }
         return Self.emptyControls(
           graph: graph, batchSize: batchSize, startWidth: startWidth, startHeight: startHeight,
           version: version)
@@ -2367,8 +2506,12 @@ extension ControlModel {
         controlNetWeightMapper = nil
         xIn =
           channels == 16 ? xT : xT[0..<batchSize, 0..<startHeight, 0..<startWidth, 0..<16].copied()
+      case .wan21_1_3b, .wan21_14b:
+        // Set the strength for the generation.
+        DynamicGraph.Tensor<FloatType>(inputs[7]).full(strength)
+        return []
       case .sd3, .sd3Large, .pixart, .auraflow, .kandinsky21, .sdxlRefiner, .ssd1b, .svdI2v,
-        .wurstchenStageC, .wurstchenStageB, .hunyuanVideo, .wan21_1_3b, .wan21_14b, .hiDreamI1:
+        .wurstchenStageC, .wurstchenStageB, .hunyuanVideo, .hiDreamI1:
         fatalError()
       }
     }
@@ -2398,7 +2541,8 @@ extension ControlModel {
         controlNet.compile(inputs: [xIn, hint[0]] + (timestep.map { [$0] } ?? []) + c)
       }
       let externalData: DynamicGraph.Store.Codec =
-        externalOnDemand ? .externalOnDemand : .externalData
+        externalOnDemand
+        ? .externalOnDemand : .externalData(deviceProperties.isFreadPreferred ? .fread : .mmap)
       if let controlNetWeightMapper = controlNetWeightMapper,
         let mainUNetAndWeightMapper = mainUNetAndWeightMapper
       {

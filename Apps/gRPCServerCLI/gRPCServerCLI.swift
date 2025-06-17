@@ -319,6 +319,25 @@ struct gRPCServerCLI: ParsableCommand {
   )
   var join: String?
 
+  @Option(
+    name: .long,
+    help:
+      "When a request is done, generation should be returned timely. This warns us if it is not returned after specified seconds."
+  )
+  var cancellationWarningTimeout: TimeInterval? = nil
+
+  @Option(
+    name: .long,
+    help:
+      "When a request is done, generation should be returned timely. This crashes the process if it is not returned after specified seconds after the warning."
+  )
+  var cancellationCrashTimeout: TimeInterval? = nil
+  @Flag(
+    help:
+      "Echo response will be done on the media generation queue. This helps to use echo call as a health check mechanism."
+  )
+  var echoOnQueue: Bool = false
+
   mutating func run() throws {
     #if os(Linux)
       if supervised {
@@ -440,9 +459,19 @@ struct gRPCServerCLI: ParsableCommand {
     }
     let queue = DispatchQueue(label: "com.draw-things.edit", qos: .userInteractive)
     let localImageGenerator = createLocalImageGenerator(queue: queue)
+    let cancellationMonitor: ImageGenerationServiceImpl.CancellationMonitor?
+    if let cancellationWarningTimeout = cancellationWarningTimeout,
+      let cancellationCrashTimeout = cancellationCrashTimeout
+    {
+      cancellationMonitor = ImageGenerationServiceImpl.CancellationMonitor(
+        warningTimeout: cancellationWarningTimeout, crashTimeout: cancellationCrashTimeout)
+    } else {
+      cancellationMonitor = nil
+    }
     let imageGenerationServiceImpl = ImageGenerationServiceImpl(
       imageGenerator: localImageGenerator, queue: queue, backupQueue: queue,
-      serverConfigurationRewriter: serverLoRALoader)
+      serverConfigurationRewriter: serverLoRALoader,
+      cancellationMonitor: cancellationMonitor, echoOnQueue: echoOnQueue)
     if noResponseCompression {
       imageGenerationServiceImpl.responseCompression.store(false, ordering: .releasing)
     } else {

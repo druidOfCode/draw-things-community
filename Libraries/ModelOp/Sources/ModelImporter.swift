@@ -891,20 +891,22 @@ public final class ModelImporter {
           timesteps: batchSize, channels: 3072, layers: (20, 40), textLength: (0, 20))
       case .wan21_1_3b:
         (unetMapper, unet) = Wan(
-          channels: 1_536, layers: 30, intermediateSize: 8_960, time: 1, height: 64, width: 64,
+          channels: 1_536, layers: 30, vaceLayers: [], intermediateSize: 8_960, time: 1, height: 64,
+          width: 64,
           textLength: 512, causalInference: 0, injectImage: true, usesFlashAttention: true,
           outputResidual: false, inputResidual: false)
         (unetFixedMapper, unetFixed) = WanFixed(
-          timesteps: 1, batchSize: (1, 1), channels: 1_536, layers: 30, textLength: 512,
-          injectImage: true)
+          timesteps: 1, batchSize: (1, 1), channels: 1_536, layers: 30, vaceLayers: [],
+          textLength: 512, injectImage: true)
       case .wan21_14b:
         (unetMapper, unet) = Wan(
-          channels: 5_120, layers: 40, intermediateSize: 13_824, time: 1, height: 64, width: 64,
+          channels: 5_120, layers: 40, vaceLayers: [], intermediateSize: 13_824, time: 1,
+          height: 64, width: 64,
           textLength: 512, causalInference: 0, injectImage: true, usesFlashAttention: true,
           outputResidual: false, inputResidual: false)
         (unetFixedMapper, unetFixed) = WanFixed(
-          timesteps: 1, batchSize: (1, 1), channels: 5_120, layers: 40, textLength: 512,
-          injectImage: true)
+          timesteps: 1, batchSize: (1, 1), channels: 5_120, layers: 40, vaceLayers: [],
+          textLength: 512, injectImage: true)
       case .hiDreamI1:
         (unet, unetMapper) = HiDream(
           batchSize: 1, height: 64, width: 64, textLength: (128, 128), layers: (16, 32),

@@ -116,9 +116,33 @@ public struct ControlNetZoo: DownloadZoo {
       "732fc3543b725d93854ef6950291123edfb6056dc372cdcf7adad4df0055dbe8",
     "controlnet_depth_sdxl_v1.0_mid_f16.ckpt":
       "6629c9ccdc2a7741c1100089c28588df7f3d3dd26260c17e9204765d62167215",
+    "wan_v2.1_1.3b_vace_480p_f16.ckpt":
+      "974eb1bd38ba2dcbf228e821102234634fd57a88d359af3695c4772c179a0e85",
+    "wan_v2.1_14b_vace_720p_f16.ckpt":
+      "5337d4bfd84a9d446486c8a2fe3e9a81e372952e053e3044b4f377dbe01cc256",
+    "wan_v2.1_1.3b_vace_480p_q8p.ckpt":
+      "62de000252a97b4c79aefb76caa9a468e6faf59bf2786c2301b8f11be0baf5e8",
+    "wan_v2.1_14b_vace_720p_q8p.ckpt":
+      "2930e1c3e7c25ae0ec128d5e9889bb07ae2ea23ea7e7900771a4b55befcd7dbd",
   ]
 
   public static let builtinSpecifications: [Specification] = [
+    Specification(
+      name: "VACE (Wan 2.1, 1.3B)",
+      file: "wan_v2.1_1.3b_vace_480p_f16.ckpt",
+      modifier: .shuffle, version: .wan21_1_3b, type: .controlnet),
+    Specification(
+      name: "VACE (Wan 2.1, 1.3B) (8-bit)",
+      file: "wan_v2.1_1.3b_vace_480p_q8p.ckpt",
+      modifier: .shuffle, version: .wan21_1_3b, type: .controlnet),
+    Specification(
+      name: "VACE (Wan 2.1, 14B)",
+      file: "wan_v2.1_14b_vace_720p_f16.ckpt",
+      modifier: .shuffle, version: .wan21_14b, type: .controlnet),
+    Specification(
+      name: "VACE (Wan 2.1, 14B) (8-bit)",
+      file: "wan_v2.1_14b_vace_720p_q8p.ckpt",
+      modifier: .shuffle, version: .wan21_14b, type: .controlnet),
     Specification(
       name: "Canny Edge Map (SD v1.x, ControlNet 1.0)", file: "controlnet_canny_1.x_f16.ckpt",
       modifier: .canny, version: .v1, type: .controlnet, deprecated: true),

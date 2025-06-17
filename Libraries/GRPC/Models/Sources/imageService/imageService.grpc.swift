@@ -36,6 +36,16 @@ public protocol ImageGenerationServiceClientProtocol: GRPCClient {
     _ request: EchoRequest,
     callOptions: CallOptions?
   ) -> UnaryCall<EchoRequest, EchoReply>
+
+  func pubkey(
+    _ request: PubkeyRequest,
+    callOptions: CallOptions?
+  ) -> UnaryCall<PubkeyRequest, PubkeyResponse>
+
+  func hours(
+    _ request: HoursRequest,
+    callOptions: CallOptions?
+  ) -> UnaryCall<HoursRequest, HoursResponse>
 }
 
 extension ImageGenerationServiceClientProtocol {
@@ -120,6 +130,42 @@ extension ImageGenerationServiceClientProtocol {
       interceptors: self.interceptors?.makeEchoInterceptors() ?? []
     )
   }
+
+  /// Unary call to Pubkey
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Pubkey.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func pubkey(
+    _ request: PubkeyRequest,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<PubkeyRequest, PubkeyResponse> {
+    return self.makeUnaryCall(
+      path: ImageGenerationServiceClientMetadata.Methods.pubkey.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makePubkeyInterceptors() ?? []
+    )
+  }
+
+  /// Unary call to Hours
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Hours.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  public func hours(
+    _ request: HoursRequest,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<HoursRequest, HoursResponse> {
+    return self.makeUnaryCall(
+      path: ImageGenerationServiceClientMetadata.Methods.hours.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeHoursInterceptors() ?? []
+    )
+  }
 }
 
 @available(*, deprecated)
@@ -202,6 +248,16 @@ public protocol ImageGenerationServiceAsyncClientProtocol: GRPCClient {
     _ request: EchoRequest,
     callOptions: CallOptions?
   ) -> GRPCAsyncUnaryCall<EchoRequest, EchoReply>
+
+  func makePubkeyCall(
+    _ request: PubkeyRequest,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<PubkeyRequest, PubkeyResponse>
+
+  func makeHoursCall(
+    _ request: HoursRequest,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<HoursRequest, HoursResponse>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -257,6 +313,30 @@ extension ImageGenerationServiceAsyncClientProtocol {
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
       interceptors: self.interceptors?.makeEchoInterceptors() ?? []
+    )
+  }
+
+  public func makePubkeyCall(
+    _ request: PubkeyRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<PubkeyRequest, PubkeyResponse> {
+    return self.makeAsyncUnaryCall(
+      path: ImageGenerationServiceClientMetadata.Methods.pubkey.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makePubkeyInterceptors() ?? []
+    )
+  }
+
+  public func makeHoursCall(
+    _ request: HoursRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<HoursRequest, HoursResponse> {
+    return self.makeAsyncUnaryCall(
+      path: ImageGenerationServiceClientMetadata.Methods.hours.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeHoursInterceptors() ?? []
     )
   }
 }
@@ -322,6 +402,30 @@ extension ImageGenerationServiceAsyncClientProtocol {
       interceptors: self.interceptors?.makeEchoInterceptors() ?? []
     )
   }
+
+  public func pubkey(
+    _ request: PubkeyRequest,
+    callOptions: CallOptions? = nil
+  ) async throws -> PubkeyResponse {
+    return try await self.performAsyncUnaryCall(
+      path: ImageGenerationServiceClientMetadata.Methods.pubkey.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makePubkeyInterceptors() ?? []
+    )
+  }
+
+  public func hours(
+    _ request: HoursRequest,
+    callOptions: CallOptions? = nil
+  ) async throws -> HoursResponse {
+    return try await self.performAsyncUnaryCall(
+      path: ImageGenerationServiceClientMetadata.Methods.hours.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeHoursInterceptors() ?? []
+    )
+  }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -354,6 +458,12 @@ public protocol ImageGenerationServiceClientInterceptorFactoryProtocol: Sendable
 
   /// - Returns: Interceptors to use when invoking 'echo'.
   func makeEchoInterceptors() -> [ClientInterceptor<EchoRequest, EchoReply>]
+
+  /// - Returns: Interceptors to use when invoking 'pubkey'.
+  func makePubkeyInterceptors() -> [ClientInterceptor<PubkeyRequest, PubkeyResponse>]
+
+  /// - Returns: Interceptors to use when invoking 'hours'.
+  func makeHoursInterceptors() -> [ClientInterceptor<HoursRequest, HoursResponse>]
 }
 
 public enum ImageGenerationServiceClientMetadata {
@@ -365,6 +475,8 @@ public enum ImageGenerationServiceClientMetadata {
       ImageGenerationServiceClientMetadata.Methods.filesExist,
       ImageGenerationServiceClientMetadata.Methods.uploadFile,
       ImageGenerationServiceClientMetadata.Methods.echo,
+      ImageGenerationServiceClientMetadata.Methods.pubkey,
+      ImageGenerationServiceClientMetadata.Methods.hours,
     ]
   )
 
@@ -392,6 +504,18 @@ public enum ImageGenerationServiceClientMetadata {
       path: "/ImageGenerationService/Echo",
       type: GRPCCallType.unary
     )
+
+    public static let pubkey = GRPCMethodDescriptor(
+      name: "Pubkey",
+      path: "/ImageGenerationService/Pubkey",
+      type: GRPCCallType.unary
+    )
+
+    public static let hours = GRPCMethodDescriptor(
+      name: "Hours",
+      path: "/ImageGenerationService/Hours",
+      type: GRPCCallType.unary
+    )
   }
 }
 
@@ -406,6 +530,10 @@ public protocol ImageGenerationServiceProvider: CallHandlerProvider {
   func uploadFile(context: StreamingResponseCallContext<UploadResponse>) -> EventLoopFuture<(StreamEvent<FileUploadRequest>) -> Void>
 
   func echo(request: EchoRequest, context: StatusOnlyCallContext) -> EventLoopFuture<EchoReply>
+
+  func pubkey(request: PubkeyRequest, context: StatusOnlyCallContext) -> EventLoopFuture<PubkeyResponse>
+
+  func hours(request: HoursRequest, context: StatusOnlyCallContext) -> EventLoopFuture<HoursResponse>
 }
 
 extension ImageGenerationServiceProvider {
@@ -456,6 +584,24 @@ extension ImageGenerationServiceProvider {
         userFunction: self.echo(request:context:)
       )
 
+    case "Pubkey":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<PubkeyRequest>(),
+        responseSerializer: ProtobufSerializer<PubkeyResponse>(),
+        interceptors: self.interceptors?.makePubkeyInterceptors() ?? [],
+        userFunction: self.pubkey(request:context:)
+      )
+
+    case "Hours":
+      return UnaryServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<HoursRequest>(),
+        responseSerializer: ProtobufSerializer<HoursResponse>(),
+        interceptors: self.interceptors?.makeHoursInterceptors() ?? [],
+        userFunction: self.hours(request:context:)
+      )
+
     default:
       return nil
     }
@@ -489,6 +635,16 @@ public protocol ImageGenerationServiceAsyncProvider: CallHandlerProvider, Sendab
     request: EchoRequest,
     context: GRPCAsyncServerCallContext
   ) async throws -> EchoReply
+
+  func pubkey(
+    request: PubkeyRequest,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> PubkeyResponse
+
+  func hours(
+    request: HoursRequest,
+    context: GRPCAsyncServerCallContext
+  ) async throws -> HoursResponse
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -546,6 +702,24 @@ extension ImageGenerationServiceAsyncProvider {
         wrapping: { try await self.echo(request: $0, context: $1) }
       )
 
+    case "Pubkey":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<PubkeyRequest>(),
+        responseSerializer: ProtobufSerializer<PubkeyResponse>(),
+        interceptors: self.interceptors?.makePubkeyInterceptors() ?? [],
+        wrapping: { try await self.pubkey(request: $0, context: $1) }
+      )
+
+    case "Hours":
+      return GRPCAsyncServerHandler(
+        context: context,
+        requestDeserializer: ProtobufDeserializer<HoursRequest>(),
+        responseSerializer: ProtobufSerializer<HoursResponse>(),
+        interceptors: self.interceptors?.makeHoursInterceptors() ?? [],
+        wrapping: { try await self.hours(request: $0, context: $1) }
+      )
+
     default:
       return nil
     }
@@ -569,6 +743,14 @@ public protocol ImageGenerationServiceServerInterceptorFactoryProtocol: Sendable
   /// - Returns: Interceptors to use when handling 'echo'.
   ///   Defaults to calling `self.makeInterceptors()`.
   func makeEchoInterceptors() -> [ServerInterceptor<EchoRequest, EchoReply>]
+
+  /// - Returns: Interceptors to use when handling 'pubkey'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makePubkeyInterceptors() -> [ServerInterceptor<PubkeyRequest, PubkeyResponse>]
+
+  /// - Returns: Interceptors to use when handling 'hours'.
+  ///   Defaults to calling `self.makeInterceptors()`.
+  func makeHoursInterceptors() -> [ServerInterceptor<HoursRequest, HoursResponse>]
 }
 
 public enum ImageGenerationServiceServerMetadata {
@@ -580,6 +762,8 @@ public enum ImageGenerationServiceServerMetadata {
       ImageGenerationServiceServerMetadata.Methods.filesExist,
       ImageGenerationServiceServerMetadata.Methods.uploadFile,
       ImageGenerationServiceServerMetadata.Methods.echo,
+      ImageGenerationServiceServerMetadata.Methods.pubkey,
+      ImageGenerationServiceServerMetadata.Methods.hours,
     ]
   )
 
@@ -605,6 +789,18 @@ public enum ImageGenerationServiceServerMetadata {
     public static let echo = GRPCMethodDescriptor(
       name: "Echo",
       path: "/ImageGenerationService/Echo",
+      type: GRPCCallType.unary
+    )
+
+    public static let pubkey = GRPCMethodDescriptor(
+      name: "Pubkey",
+      path: "/ImageGenerationService/Pubkey",
+      type: GRPCCallType.unary
+    )
+
+    public static let hours = GRPCMethodDescriptor(
+      name: "Hours",
+      path: "/ImageGenerationService/Hours",
       type: GRPCCallType.unary
     )
   }
