@@ -136,14 +136,14 @@ convert_safetensors() {
             mkdir -p "$SAFETENSORS_BACKUP_DIR"
         fi
         
-        # Run the model converter
-        local converter_script="$SERVER_DIR/model_converter.py"
-        if [ -f "$converter_script" ]; then
-            log "Running model converter..."
-            cd "$SERVER_DIR"
-            python3 "$converter_script" --base_path "$MODELS_DIR"
-            local conversion_result=$?
-            cd - >/dev/null
+        # Run the official ModelConverter on each file
+        if command -v ModelConverter >/dev/null 2>&1; then
+            log "Running ModelConverter..."
+            local conversion_result=0
+            for file in "${safetensors_files[@]}"; do
+                local modelname=$(basename "$file" .safetensors)
+                ModelConverter --file "$file" --name "$modelname" --outputDirectory "$MODELS_DIR" || conversion_result=1
+            done
             
             # If conversion was successful, backup and remove safetensors files
             if [ $conversion_result -eq 0 ]; then
@@ -168,7 +168,7 @@ convert_safetensors() {
                 return 1
             fi
         else
-            error "Model converter not found: $converter_script"
+            error "ModelConverter tool not found"
             return 1
         fi
     else
@@ -235,11 +235,27 @@ merge_with_existing() {
     if [ ! -f "$CUSTOM_JSON_BACKUP" ]; then
         return
     fi
-    
+
+    if ! command -v jq >/dev/null 2>&1; then
+        warn "jq not found - skipping merge with existing custom.json"
+        return
+    fi
+
     log "Attempting to preserve manually configured models..."
-    # This is a placeholder for more sophisticated merging logic
-    # You could implement JSON parsing here to preserve specific model configs
-    warn "Manual merging not implemented yet - check $CUSTOM_JSON_BACKUP for previous configurations"
+
+    local merged
+    if ! merged=$(jq -s '.[0] + .[1] | unique_by(.name)' "$CUSTOM_JSON" "$CUSTOM_JSON_BACKUP" 2>/dev/null); then
+        error "Failed to merge JSON files"
+        return
+    fi
+
+    echo "$merged" | jq '.' > "$CUSTOM_JSON"
+
+    mapfile -t kept_names < <(echo "$merged" | jq -r '.[].name')
+    log "Merged custom.json - keeping ${#kept_names[@]} entries:"
+    for name in "${kept_names[@]}"; do
+        log "  - $name"
+    done
 }
 
 # Main execution

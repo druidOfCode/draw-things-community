@@ -113,7 +113,7 @@ Example configuration:
 # Enable model browser (allows clients to browse available models)
 MODEL_BROWSER=true
 
-# Set weights cache for better performance (4GB)
+# Set weights cache for better performance (defaults to 50% of RAM if unset)
 WEIGHTS_CACHE=4
 
 # Enable supervised mode (auto-restart on crashes)
@@ -133,7 +133,7 @@ SHARED_SECRET=your_secret_here
 
 **Performance Options:**
 - `--no-flash-attention`: Disable FlashAttention (required for RTX 20xx cards)
-- `--weights-cache SIZE`: Set weights cache size in GiB (default: 4)
+- `--weights-cache SIZE`: Set weights cache size in GiB (default: 50% of RAM)
 - `--cpu-offload`: Enable CPU offloading for large models
 
 **Feature Options:**
@@ -162,7 +162,7 @@ SHARED_SECRET=your_secret_here
 # Start with CPU only
 ./scripts/start-server.sh --cpu-only
 
-# Start with larger weights cache for better performance
+# Start with larger weights cache (override auto-sized default)
 ./scripts/start-server.sh --weights-cache 8
 
 # Start with CPU offloading for large models

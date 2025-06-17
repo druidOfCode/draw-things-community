@@ -99,36 +99,110 @@ list_models() {
 # Function to add/update model
 add_model() {
     local model_file="$1"
-    local model_name="${2:-$(basename "$model_file" .ckpt)}"
-    local version="${3:-auto}"
-    local scale="${4:-16}"
-    local prefix="${5:-}"
-    local config_file="${6:-}"
-    
+    shift
+
+    # Default values
+    local model_name=""
+    local version=""
+    local scale="16"
+    local prefix=""
+    local config_file=""
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --name)
+                model_name="$2"; shift 2;;
+            --version)
+                version="$2"; shift 2;;
+            --scale)
+                scale="$2"; shift 2;;
+            --prefix)
+                prefix="$2"; shift 2;;
+            --config-file)
+                config_file="$2"; shift 2;;
+            *)
+                error "Unknown option: $1"; return 1;;
+        esac
+    done
+
+    # Derive name if not specified
+    if [ -z "$model_name" ]; then
+        model_name=$(basename "$model_file" .ckpt)
+        model_name=$(basename "$model_name" .safetensors)
+    fi
+
     if [ ! -f "$MODELS_DIR/$model_file" ]; then
         error "Model file not found: $MODELS_DIR/$model_file"
         return 1
     fi
-    
-    # Check for custom config file
+
+    # Ensure custom.json exists
+    [ -f "$CUSTOM_JSON" ] || echo '[]' > "$CUSTOM_JSON"
+
+    backup_config
+
+    local entry
     if [ -n "$config_file" ] && [ -f "$config_file" ]; then
-        log "Using custom configuration from: $config_file"
-        # TODO: Implement custom config merging
-        warn "Custom config file support not yet implemented"
+        entry=$(jq \
+            --arg name "$model_name" \
+            --arg file "$(basename "$model_file")" \
+            --arg version "$version" \
+            --arg scale "$scale" \
+            --arg prefix "$prefix" \
+            '.name=$name | .file=$file | (.version=$version) | (.default_scale=($scale|tonumber)) | (.prefix=$prefix)' "$config_file")
+    else
+        entry=$(jq -n \
+            --arg name "$model_name" \
+            --arg file "$(basename "$model_file")" \
+            --arg version "$version" \
+            --arg scale "$scale" \
+            --arg prefix "$prefix" \
+            '{name:$name,file:$file,default_scale:($scale|tonumber),prefix:$prefix,version:$version}')
     fi
-    
-    log "Adding/updating model: $model_name"
-    info "This is a placeholder - full implementation would modify custom.json"
-    info "For now, run update-custom-json.sh to regenerate the file"
+
+    local tmp
+    tmp=$(mktemp)
+    jq --argjson entry "$entry" --arg name "$model_name" '
+        (map(select(.name==$name)) | length) as $count |
+        if $count == 0 then . + [$entry]
+        else map(if .name==$name then $entry else . end) end
+    ' "$CUSTOM_JSON" > "$tmp" && mv "$tmp" "$CUSTOM_JSON"
+
+    if validate_json "$CUSTOM_JSON"; then
+        log "Model $model_name added/updated"
+    else
+        error "Resulting custom.json is invalid. Check backup."
+        return 1
+    fi
 }
 
 # Function to remove model
 remove_model() {
     local model_name="$1"
-    
-    log "Removing model: $model_name"
-    info "This is a placeholder - full implementation would modify custom.json"
-    info "For now, manually edit custom.json or run update-custom-json.sh"
+
+    if [ ! -f "$CUSTOM_JSON" ]; then
+        error "custom.json not found"
+        return 1
+    fi
+
+    if ! jq -e --arg name "$model_name" 'any(.name == $name)' "$CUSTOM_JSON" >/dev/null; then
+        warn "Model $model_name not found in configuration"
+        return 0
+    fi
+
+    backup_config
+
+    local tmp
+    tmp=$(mktemp)
+    jq --arg name "$model_name" 'map(select(.name != $name))' "$CUSTOM_JSON" > "$tmp" && mv "$tmp" "$CUSTOM_JSON"
+
+    if validate_json "$CUSTOM_JSON"; then
+        log "Model $model_name removed"
+    else
+        error "Resulting custom.json is invalid. Check backup."
+        return 1
+    fi
 }
 
 # Function to backup custom.json

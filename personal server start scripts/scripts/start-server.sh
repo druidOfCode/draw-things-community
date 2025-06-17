@@ -69,11 +69,18 @@ BACKGROUND=false
 INTERACTIVE=false
 FORCE_CPU=false
 MODEL_BROWSER=true
-WEIGHTS_CACHE=4
+WEIGHTS_CACHE=""
 SUPERVISED=true
 SHARED_SECRET=""
 CPU_OFFLOAD=false
 DEBUG=false
+
+# Load configuration file so command line arguments can override values
+if [ -f "$CONFIG_FILE" ]; then
+    log "Loading configuration from $CONFIG_FILE"
+    # Source the config file, ignoring comments and empty lines
+    source <(grep -E '^[^#]*=' "$CONFIG_FILE" 2>/dev/null || true)
+fi
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -130,7 +137,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --cpu-only              Force CPU-only mode (no GPU)"
             echo "  --port PORT             Server port (default: 7859)"
             echo "  --no-model-browser      Disable model browsing (enabled by default)"
-            echo "  --weights-cache SIZE    Set weights cache size in GiB (default: 4)"
+            echo "  --weights-cache SIZE    Set weights cache size in GiB (default: 50% of RAM)"
             echo "  --no-supervised         Disable supervised mode (enabled by default)"
             echo "  --shared-secret SECRET  Set shared secret for server security"
             echo "  --cpu-offload           Enable CPU offloading for large models"
@@ -146,6 +153,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 log "Starting Draw Things Community Server..."
+
 
 # Load configuration file if it exists
 if [ -f "$CONFIG_FILE" ]; then
@@ -172,6 +180,16 @@ if [ -f "$CONFIG_FILE" ]; then
         value=${line#*=}
         declare -g "$key"="$value"
     done < "$CONFIG_FILE"
+
+if [ -z "$WEIGHTS_CACHE" ]; then
+    if command -v free >/dev/null 2>&1; then
+        TOTAL_MEM_GB=$(free -g | awk '/^Mem:/ {print $2}')
+    elif [ -f /proc/meminfo ]; then
+        TOTAL_MEM_GB=$(awk '/MemTotal/ {print int($2/1024/1024)}' /proc/meminfo)
+    else
+        TOTAL_MEM_GB=0
+    fi
+    WEIGHTS_CACHE=$(( TOTAL_MEM_GB / 2 ))
 fi
 
 # Check if models directory exists and has content
