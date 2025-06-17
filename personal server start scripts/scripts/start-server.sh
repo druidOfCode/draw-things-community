@@ -17,6 +17,7 @@ SERVER_DIR="$HOME/Development/draw-things-server"
 MODELS_DIR="$SERVER_DIR/models"
 LOGS_DIR="$SERVER_DIR/logs"
 CONTAINER_NAME="draw-things-server"
+NATIVE_BIN="$SERVER_DIR/bin/gRPCServerCLI"
 SERVER_PORT="7859"
 HOST_IP="0.0.0.0"
 CONFIG_FILE="$SERVER_DIR/server.conf"
@@ -185,80 +186,118 @@ mkdir -p "$LOGS_DIR"
 log "Updating custom.json with available models..."
 "$SERVER_DIR/scripts/update-custom-json.sh"
 
-# Always pull the latest Docker image to ensure we're up-to-date
-log "Pulling latest Docker image..."
-docker pull drawthingsai/draw-things-grpc-server-cli:latest
+USE_NATIVE=false
+if [ -x "$NATIVE_BIN" ]; then
+    USE_NATIVE=true
+    log "Using native binary at $NATIVE_BIN"
+else
+    # Always pull the latest Docker image to ensure we're up-to-date
+    log "Pulling latest Docker image..."
+    docker pull drawthingsai/draw-things-grpc-server-cli:latest
 
-# Stop any existing container
-stop_container
+    # Stop any existing container
+    stop_container
 
-# Build Docker run command
-DOCKER_CMD=("docker" "run")
+    # Build Docker run command
+    DOCKER_CMD=("docker" "run")
+fi
 
 # Add GPU support unless CPU-only mode is requested
-if [ "$FORCE_CPU" = false ]; then
-    DOCKER_CMD+=("--gpus" "all")
-fi
+if [ "$USE_NATIVE" = false ]; then
+    if [ "$FORCE_CPU" = false ]; then
+        DOCKER_CMD+=("--gpus" "all")
+    fi
 
-# Container settings
-DOCKER_CMD+=(
-    "--name" "$CONTAINER_NAME"
-    "-v" "$MODELS_DIR:/grpc-models"
-    "-v" "$LOGS_DIR:/logs"
-    "-p" "$SERVER_PORT:7859"
-    "--restart" "unless-stopped"
-)
+    DOCKER_CMD+=(
+        "--name" "$CONTAINER_NAME"
+        "-v" "$MODELS_DIR:/grpc-models"
+        "-v" "$LOGS_DIR:/logs"
+        "-p" "$SERVER_PORT:7859"
+        "--restart" "unless-stopped"
+    )
 
-# Run mode (background vs interactive)
-if [ "$BACKGROUND" = true ]; then
-    DOCKER_CMD+=("-d")
-elif [ "$INTERACTIVE" = true ]; then
-    DOCKER_CMD+=("-it")
+    if [ "$BACKGROUND" = true ]; then
+        DOCKER_CMD+=("-d")
+    elif [ "$INTERACTIVE" = true ]; then
+        DOCKER_CMD+=("-it")
+    else
+        DOCKER_CMD+=("-t")
+    fi
+
+    DOCKER_CMD+=("drawthingsai/draw-things-grpc-server-cli:latest")
+    DOCKER_CMD+=("gRPCServerCLI" "/grpc-models")
+
+    if [ "$FLASH_ATTENTION" = false ]; then
+        DOCKER_CMD+=("--no-flash-attention")
+    fi
+
+    if [ "$MODEL_BROWSER" = true ]; then
+        DOCKER_CMD+=("--model-browser")
+    fi
+
+    if [ "$SUPERVISED" = true ]; then
+        DOCKER_CMD+=("--supervised")
+    fi
+
+    if [ "$CPU_OFFLOAD" = true ]; then
+        DOCKER_CMD+=("--cpu-offload")
+    fi
+
+    if [ "$DEBUG" = true ]; then
+        DOCKER_CMD+=("--debug")
+    fi
+
+    if [ -n "$SHARED_SECRET" ]; then
+        DOCKER_CMD+=("--shared-secret" "$SHARED_SECRET")
+    fi
+
+    if [ "$WEIGHTS_CACHE" != "0" ]; then
+        DOCKER_CMD+=("--weights-cache" "$WEIGHTS_CACHE")
+    fi
+
+    DOCKER_CMD+=("${EXTRA_ARGS[@]}")
 else
-    # Default: attached but not interactive
-    DOCKER_CMD+=("-t")
+    BINARY_CMD=("$NATIVE_BIN" "$MODELS_DIR")
+
+    BINARY_CMD+=("--host" "$HOST_IP" "--port" "$SERVER_PORT")
+
+    if [ "$FLASH_ATTENTION" = false ]; then
+        BINARY_CMD+=("--no-flash-attention")
+    fi
+
+    if [ "$MODEL_BROWSER" = true ]; then
+        BINARY_CMD+=("--model-browser")
+    fi
+
+    if [ "$SUPERVISED" = true ]; then
+        BINARY_CMD+=("--supervised")
+    fi
+
+    if [ "$CPU_OFFLOAD" = true ]; then
+        BINARY_CMD+=("--cpu-offload")
+    fi
+
+    if [ "$DEBUG" = true ]; then
+        BINARY_CMD+=("--debug")
+    fi
+
+    if [ -n "$SHARED_SECRET" ]; then
+        BINARY_CMD+=("--shared-secret" "$SHARED_SECRET")
+    fi
+
+    if [ "$WEIGHTS_CACHE" != "0" ]; then
+        BINARY_CMD+=("--weights-cache" "$WEIGHTS_CACHE")
+    fi
+
+    BINARY_CMD+=("${EXTRA_ARGS[@]}")
 fi
-
-# Docker image
-DOCKER_CMD+=("drawthingsai/draw-things-grpc-server-cli:latest")
-
-# Server command and arguments
-DOCKER_CMD+=("gRPCServerCLI" "/grpc-models")
-
-# Add server configuration flags
-if [ "$FLASH_ATTENTION" = false ]; then
-    DOCKER_CMD+=("--no-flash-attention")
-fi
-
-if [ "$MODEL_BROWSER" = true ]; then
-    DOCKER_CMD+=("--model-browser")
-fi
-
-if [ "$SUPERVISED" = true ]; then
-    DOCKER_CMD+=("--supervised")
-fi
-
-if [ "$CPU_OFFLOAD" = true ]; then
-    DOCKER_CMD+=("--cpu-offload")
-fi
-
-if [ "$DEBUG" = true ]; then
-    DOCKER_CMD+=("--debug")
-fi
-
-if [ -n "$SHARED_SECRET" ]; then
-    DOCKER_CMD+=("--shared-secret" "$SHARED_SECRET")
-fi
-
-if [ "$WEIGHTS_CACHE" != "0" ]; then
-    DOCKER_CMD+=("--weights-cache" "$WEIGHTS_CACHE")
-fi
-
-# Add extra arguments
-DOCKER_CMD+=("${EXTRA_ARGS[@]}")
 
 log "Starting server with command:"
-echo "  ${DOCKER_CMD[*]}"
+if [ "$USE_NATIVE" = false ]; then
+    echo "  ${DOCKER_CMD[*]}"
+else
+    echo "  ${BINARY_CMD[*]}"
+fi
 log "Server will be available on port $SERVER_PORT"
 
 # Get and display connection info
@@ -313,12 +352,19 @@ fi
 
 # Function to cleanup on exit
 cleanup() {
-    log "\nReceived interrupt signal. Stopping container gracefully..."
-    if docker stop "$CONTAINER_NAME" >/dev/null 2>&1; then
-        log "Container stopped successfully"
+    if [ "$USE_NATIVE" = false ]; then
+        log "\nReceived interrupt signal. Stopping container gracefully..."
+        if docker stop "$CONTAINER_NAME" >/dev/null 2>&1; then
+            log "Container stopped successfully"
+        else
+            warn "Failed to stop container gracefully, force killing..."
+            docker kill "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        fi
     else
-        warn "Failed to stop container gracefully, force killing..."
-        docker kill "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        log "\nReceived interrupt signal. Stopping server..."
+        if [ -f "$SERVER_DIR/server.pid" ]; then
+            kill "$(cat "$SERVER_DIR/server.pid")" >/dev/null 2>&1 || true
+        fi
     fi
     exit 0
 }
@@ -328,19 +374,29 @@ if [ "$BACKGROUND" = false ]; then
     trap cleanup SIGINT SIGTERM
 fi
 
-# Start the container
-log "Starting container..."
-if "${DOCKER_CMD[@]}"; then
-    if [ "$BACKGROUND" = true ]; then
-        log "Server started successfully in background!"
-        log "Check logs with: docker logs -f $CONTAINER_NAME"
-        log "Stop server with: docker stop $CONTAINER_NAME"
-        log "Or use the stop script: ./scripts/stop-server.sh"
+if [ "$USE_NATIVE" = false ]; then
+    log "Starting container..."
+    if "${DOCKER_CMD[@]}"; then
+        if [ "$BACKGROUND" = true ]; then
+            log "Server started successfully in background!"
+            log "Check logs with: docker logs -f $CONTAINER_NAME"
+            log "Stop server with: docker stop $CONTAINER_NAME"
+            log "Or use the stop script: ./scripts/stop-server.sh"
+        else
+            log "Server stopped."
+        fi
     else
-        log "Server stopped."
+        error "Failed to start server"
+        exit 1
     fi
 else
-    error "Failed to start server"
-    exit 1
+    log "Starting native server..."
+    if [ "$BACKGROUND" = true ]; then
+        "${BINARY_CMD[@]}" > "$LOGS_DIR/server.log" 2>&1 &
+        echo $! > "$SERVER_DIR/server.pid"
+        log "Server started successfully in background! PID $(cat "$SERVER_DIR/server.pid")"
+    else
+        "${BINARY_CMD[@]}"
+    fi
 fi
 
