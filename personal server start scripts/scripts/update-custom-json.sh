@@ -235,11 +235,27 @@ merge_with_existing() {
     if [ ! -f "$CUSTOM_JSON_BACKUP" ]; then
         return
     fi
-    
+
+    if ! command -v jq >/dev/null 2>&1; then
+        warn "jq not found - skipping merge with existing custom.json"
+        return
+    fi
+
     log "Attempting to preserve manually configured models..."
-    # This is a placeholder for more sophisticated merging logic
-    # You could implement JSON parsing here to preserve specific model configs
-    warn "Manual merging not implemented yet - check $CUSTOM_JSON_BACKUP for previous configurations"
+
+    local merged
+    if ! merged=$(jq -s '.[0] + .[1] | unique_by(.name)' "$CUSTOM_JSON" "$CUSTOM_JSON_BACKUP" 2>/dev/null); then
+        error "Failed to merge JSON files"
+        return
+    fi
+
+    echo "$merged" | jq '.' > "$CUSTOM_JSON"
+
+    mapfile -t kept_names < <(echo "$merged" | jq -r '.[].name')
+    log "Merged custom.json - keeping ${#kept_names[@]} entries:"
+    for name in "${kept_names[@]}"; do
+        log "  - $name"
+    done
 }
 
 # Main execution
