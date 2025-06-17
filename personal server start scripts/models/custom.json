@@ -1,0 +1,583 @@
+[
+  {
+    "name": "redcraftcadsupdatedjun1_redomniflux1dreamo_f16",
+    "file": "redcraftcadsupdatedjun1_redomniflux1dreamo_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+
+  }
+,
+  {
+    "name": "flux_1_redux_f16",
+    "file": "flux_1_redux_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+
+  }
+,
+  {
+    "name": "realdream_sdxlpony16_f16",
+    "file": "realdream_sdxlpony16_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sdxl_base_v0.9",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sdxl_vae_v1.0_f16.ckpt"
+
+  }
+,
+  {
+    "name": "chroma_unlocked_v35_detail_calibrated_f16",
+    "file": "chroma_unlocked_v35_detail_calibrated_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+,
+    "mmdit": {
+      "dual_attention_layers": [],
+      "distilled_guidance_layers": 5,
+      "qk_norm": true
+    }
+
+  }
+,
+  {
+    "name": "redcraftcadsupdatedapr28_redidreamnsfwi1_f16",
+    "file": "redcraftcadsupdatedapr28_redidreamnsfwi1_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "chroma_unlocked_v35_f16",
+    "file": "chroma_unlocked_v35_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+,
+    "mmdit": {
+      "dual_attention_layers": [],
+      "distilled_guidance_layers": 5,
+      "qk_norm": true
+    }
+
+  }
+,
+  {
+    "name": "remacri_4x_f16",
+    "file": "remacri_4x_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "realdream_sdxlpony17_f16",
+    "file": "realdream_sdxlpony17_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sdxl_base_v0.9",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sdxl_vae_v1.0_f16.ckpt"
+
+  }
+,
+  {
+    "name": "getphatfluxreality_v7_f16",
+    "file": "getphatfluxreality_v7_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+
+  }
+,
+  {
+    "name": "chroma_unlocked_v36_detail_calibrated_f16",
+    "file": "chroma_unlocked_v36_detail_calibrated_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+,
+    "mmdit": {
+      "dual_attention_layers": [],
+      "distilled_guidance_layers": 5,
+      "qk_norm": true
+    }
+
+  }
+,
+  {
+    "name": "acornisboningxl_acornisboningxl3_f16",
+    "file": "acornisboningxl_acornisboningxl3_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sdxl_base_v0.9",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sdxl_vae_v1.0_f16.ckpt"
+
+  }
+,
+  {
+    "name": "restoreformer_v1.0_f16",
+    "file": "restoreformer_v1.0_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "yiffymix_v62noobxl_f16",
+    "file": "yiffymix_v62noobxl_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sdxl_base_v0.9",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sdxl_vae_v1.0_f16.ckpt"
+
+  }
+,
+  {
+    "name": "wan_v2.1_14b_i2v_720p_q8p",
+    "file": "wan_v2.1_14b_i2v_720p_q8p.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "chroma_unlocked_v34_detail_calibrated_f16",
+    "file": "chroma_unlocked_v34_detail_calibrated_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+,
+    "mmdit": {
+      "dual_attention_layers": [],
+      "distilled_guidance_layers": 5,
+      "qk_norm": true
+    }
+
+  }
+,
+  {
+    "name": "pony_16.2_real_dream_f16",
+    "file": "pony_16.2_real_dream_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "chroma_unlocked_v37_detail_calibrated_f16",
+    "file": "chroma_unlocked_v37_detail_calibrated_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+,
+    "mmdit": {
+      "dual_attention_layers": [],
+      "distilled_guidance_layers": 5,
+      "qk_norm": true
+    }
+
+  }
+,
+  {
+    "name": "chroma_unlocked_v36_f16",
+    "file": "chroma_unlocked_v36_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+,
+    "mmdit": {
+      "dual_attention_layers": [],
+      "distilled_guidance_layers": 5,
+      "qk_norm": true
+    }
+
+  }
+,
+  {
+    "name": "wan_v2.1_14b_720p_q8p",
+    "file": "wan_v2.1_14b_720p_q8p.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "siglip_so400m_384_f16",
+    "file": "siglip_so400m_384_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "juggernaut_xl_ragnarok_q6p_q8p",
+    "file": "juggernaut_xl_ragnarok_q6p_q8p.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sdxl_base_v0.9",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sdxl_vae_v1.0_f16.ckpt"
+
+  }
+,
+  {
+    "name": "chroma_unlocked_v37_f16",
+    "file": "chroma_unlocked_v37_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "flux1",
+    "text_encoder": "t5_xxl_encoder_q6p.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "flux_1_vae_f16.ckpt",
+    "high_precision_autoencoder": true,
+    "hires_fix_scale": 24,
+    "noise_discretization": {
+      "rf": {
+        "_0": {
+          "sigma_min": 0,
+          "sigma_max": 1,
+          "condition_scale": 1000
+        }
+      }
+    },
+    "objective": {
+      "u": {
+        "condition_scale": 1000
+      }
+    }
+,
+    "mmdit": {
+      "dual_attention_layers": [],
+      "distilled_guidance_layers": 5,
+      "qk_norm": true
+    }
+
+  }
+,
+  {
+    "name": "wan_v2.1_14b_720p_q6p_svd",
+    "file": "wan_v2.1_14b_720p_q6p_svd.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "llama_3.1_8b_instruct_q8p",
+    "file": "llama_3.1_8b_instruct_q8p.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+,
+  {
+    "name": "yiffymix_v61arenoobxl_f16",
+    "file": "yiffymix_v61arenoobxl_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sdxl_base_v0.9",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "clip_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sdxl_vae_v1.0_f16.ckpt"
+
+  }
+,
+  {
+    "name": "parsenet_v1.0_f16",
+    "file": "parsenet_v1.0_f16.ckpt",
+    "default_scale": 16,
+    "modifier": "none",
+    "prefix": "",
+    "upcast_attention": false
+,
+    "version": "sd_v1.5",
+    "text_encoder": "clip_vit_l14_f16.ckpt",
+    "autoencoder": "sd_vae_f16.ckpt"
+
+  }
+]
