@@ -136,14 +136,14 @@ convert_safetensors() {
             mkdir -p "$SAFETENSORS_BACKUP_DIR"
         fi
         
-        # Run the model converter
-        local converter_script="$SERVER_DIR/model_converter.py"
-        if [ -f "$converter_script" ]; then
-            log "Running model converter..."
-            cd "$SERVER_DIR"
-            python3 "$converter_script" --base_path "$MODELS_DIR"
-            local conversion_result=$?
-            cd - >/dev/null
+        # Run the official ModelConverter on each file
+        if command -v ModelConverter >/dev/null 2>&1; then
+            log "Running ModelConverter..."
+            local conversion_result=0
+            for file in "${safetensors_files[@]}"; do
+                local modelname=$(basename "$file" .safetensors)
+                ModelConverter --file "$file" --name "$modelname" --outputDirectory "$MODELS_DIR" || conversion_result=1
+            done
             
             # If conversion was successful, backup and remove safetensors files
             if [ $conversion_result -eq 0 ]; then
@@ -168,7 +168,7 @@ convert_safetensors() {
                 return 1
             fi
         else
-            error "Model converter not found: $converter_script"
+            error "ModelConverter tool not found"
             return 1
         fi
     else
