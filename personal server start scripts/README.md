@@ -109,6 +109,8 @@ You can set default options in `server.conf` to avoid specifying them every time
 vim ~/Development/draw-things-server/server.conf
 ```
 
+Only simple `KEY=value` pairs are supported. Lines with shell metacharacters or spaces around the `=` will be ignored.
+
 Example configuration:
 ```bash
 # Enable model browser (allows clients to browse available models)

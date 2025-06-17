@@ -155,7 +155,33 @@ done
 
 log "Starting Draw Things Community Server..."
 
-# Determine total memory in GiB if weights cache size wasn't provided
+
+# Load configuration file if it exists
+if [ -f "$CONFIG_FILE" ]; then
+    log "Loading configuration from $CONFIG_FILE"
+
+    # Safer parser for simple KEY=value pairs
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip comments and empty lines
+        [[ -z "$line" || "$line" == \#* ]] && continue
+
+        # Ensure the line matches KEY=value with no spaces around '='
+        if [[ ! $line =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]][^#]*$ ]]; then
+            warn "Ignoring invalid line in config: $line"
+            continue
+        fi
+
+        # Reject shell metacharacters
+        if [[ $line =~ [\`\$\(\)\{\}\[\]\|\&\;\<\>] ]]; then
+            warn "Ignoring unsafe line in config: $line"
+            continue
+        fi
+
+        key=${line%%=*}
+        value=${line#*=}
+        declare -g "$key"="$value"
+    done < "$CONFIG_FILE"
+
 if [ -z "$WEIGHTS_CACHE" ]; then
     if command -v free >/dev/null 2>&1; then
         TOTAL_MEM_GB=$(free -g | awk '/^Mem:/ {print $2}')
