@@ -38,6 +38,8 @@ Run the setup script to install dependencies and configure the environment:
 
 ```bash
 ~/Development/draw-things-server/scripts/setup.sh
+# To compile a native server binary as well:
+~/Development/draw-things-server/scripts/setup.sh --build-native
 ```
 
 This script will:
@@ -46,6 +48,7 @@ This script will:
 - Clone the Draw Things Community repository
 - Pull the latest Docker image
 - Test GPU access
+- Optionally build gRPCServerCLI natively with `--build-native`
 
 ### 2. Add AI Models
 

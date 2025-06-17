@@ -35,6 +35,20 @@ SCRIPTS_DIR="$SERVER_DIR/scripts"
 
 log "Starting Draw Things Community Server Setup..."
 
+# Parse command line arguments
+BUILD_NATIVE=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --build-native)
+            BUILD_NATIVE=true
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 # Check if running as root
 if [[ $EUID -eq 0 ]]; then
    error "This script should not be run as root. Please run as regular user."
@@ -99,6 +113,37 @@ if docker run --rm --gpus all drawthingsai/draw-things-grpc-server-cli:latest nv
 else
     error "GPU test failed. Check $LOGS_DIR/gpu-test.log for errors."
     exit 1
+fi
+
+# Optionally build native binary
+if [ "$BUILD_NATIVE" = true ]; then
+    log "Installing native build dependencies..."
+    sudo apt-get update
+    sudo apt-get -y install libpng-dev libjpeg-dev libatlas-base-dev libblas-dev clang llvm
+
+    if ! command -v bazel >/dev/null 2>&1; then
+        log "Installing Bazelisk..."
+        curl -L -o /tmp/bazelisk https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+        chmod +x /tmp/bazelisk
+        sudo mv /tmp/bazelisk /usr/local/bin/bazel
+    fi
+
+    cd "$REPO_DIR"
+    if [ ! -f .bazelrc.local ]; then
+        cat <<'EOF' > .bazelrc.local
+build --action_env TF_NEED_CUDA="1"
+build --action_env TF_CUDA_VERSION="12.4"
+build --action_env TF_CUDA_COMPUTE_CAPABILITIES="8.9"
+build --config=clang
+build --config=cuda
+EOF
+    fi
+
+    log "Building gRPCServerCLI natively..."
+    bazel build Apps:gRPCServerCLI --keep_going --spawn_strategy=local --compilation_mode=opt
+    mkdir -p "$SERVER_DIR/bin"
+    cp bazel-bin/Apps/gRPCServerCLI "$SERVER_DIR/bin/gRPCServerCLI"
+    log "Native binary installed to $SERVER_DIR/bin/gRPCServerCLI"
 fi
 
 # Create models directory with proper permissions
